@@ -27,20 +27,13 @@ bool solve(
     const size_t maxShifts,
     DailySchedule& sched,
     size_t day,
-    std::vector<size_t>& current
-);
-
-bool isValid(
-    const AvailabilityMatrix& avail,
-    const size_t maxShifts,
-    DailySchedule& sched,
-    size_t day,
-    Worker_T worker
+    std::vector<size_t>& shiftTracker,
+    size_t numDays,
+    size_t numWorkers
 );
 
 
 // Add your implementation of schedule() and other helper functions here
-
 bool schedule(
     const AvailabilityMatrix& avail,
     const size_t dailyNeed,
@@ -53,8 +46,20 @@ bool schedule(
     }
     sched.clear();
     // Add your code below
-    std::vector<size_t> current;
-    return solve(avail, dailyNeed, maxShifts, sched, 0, current);
+    size_t numDays = avail.size();
+    size_t numWorkers = avail[0].size();
+
+    std::vector<size_t> shiftTracker;
+    for (size_t i = 0; i < numWorkers; ++i) {
+        shiftTracker.push_back(0);
+    }
+
+    for (size_t i = 0; i <numDays; i++){
+        vector<Worker_T> day;
+        sched.push_back(day);
+    }
+
+    return solve(avail, dailyNeed, maxShifts, sched, 0, shiftTracker, numDays, numWorkers);
 }
 
 // Define any helper functions here
@@ -64,76 +69,38 @@ bool solve(
     const size_t maxShifts,
     DailySchedule& sched,
     size_t day,
-    std::vector<size_t>& current
+    std::vector<size_t>& shiftTracker,
+    size_t numDays,
+    size_t numWorkers
 ){
     // We have reached the end of the schedule and found a solution
-    if (day == avail.size()){
+    if (day >= numDays){
         return true;
     }
 
     // Check if we have scheduled enough workers for the current day
-    if (current.size() == dailyNeed){
-        sched.push_back(std::vector<Worker_T>());
-        // Add the workers for the current day to the schedule
-        for (size_t x = 0; x < current.size(); ++x) {
-            sched[day].push_back(static_cast<Worker_T>(current[x]));
-        }
-        std::vector<size_t> next_day_workers;
-        // Check the next day
-        if (solve(avail, dailyNeed, maxShifts, sched, day + 1, next_day_workers)){
-            return true;
-        }
-        // No solution, remove workers from current day and return false
-        sched.pop_back();
-        return false;
+    if (sched[day].size() >= dailyNeed){
+        return solve(avail, dailyNeed, maxShifts, sched, day + 1, shiftTracker, numDays, numWorkers);
     }
 
     // Look at all possible workers, find which ones are valid, and add it to the current schedule
-    for (Worker_T worker = 0; worker < avail[0].size(); ++worker){
-        // Check if schedule is valid
-        if (isValid(avail, maxShifts, sched, day, worker)) {
-            bool already_used = false;
-            for (size_t i = 0; i < current.size(); i++) {
-                if (current[i] == worker) {
-                    already_used = true;
-                    break;
-                }
+    for (size_t i = 0; i < numWorkers; i++){
+        if (shiftTracker[i] < maxShifts && avail[day][i] == true && std::find(sched[day].begin(), sched[day].end(), i) == sched[day].end()){
+            // Add the worker to the schedule
+            sched[day].push_back(i);
+            shiftTracker[i]++;
+
+            // Call solve to check the next day
+            if (solve(avail, dailyNeed, maxShifts, sched, day, shiftTracker, numDays, numWorkers)){
+                return true;
             }
-            if (!already_used) {
-                current.push_back(worker);
-                if (solve(avail, dailyNeed, maxShifts, sched, day, current)) {
-                    return true;
-                }
-                current.pop_back();
-            }
+
+            // No solution, backtrack and remove the worker from the schedule
+            sched[day].pop_back();
+            shiftTracker[i]--;
         }
     }
     // No solution found for the day
     return false;
 }
 
-bool isValid(
-    const AvailabilityMatrix& avail,
-    const size_t maxShifts,
-    DailySchedule& sched,
-    size_t day,
-    Worker_T worker
-){
-    // Check if worker is available on the day
-    if(!avail[day][worker]){
-        return false;
-    }
-    // Check if worker has already worked the max shifts
-    size_t shifts_worked = 0;
-    for (size_t x = 0; x < sched.size(); ++x) {
-        for (size_t y = 0; y < sched[x].size(); ++y) {
-            if (sched[x][y] == worker) {
-                shifts_worked++;
-            }
-        }
-    }
-    if (shifts_worked >= maxShifts) {
-        return false;
-    }
-    return true;
-}
